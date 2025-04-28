@@ -36,20 +36,18 @@ def load_msr(path, T=20, V=20):
     labels = np.array(label_list, dtype=np.int64)
     return data, labels
 
+# utils/data_utils.py
+
+import os
+import numpy as np
+
 def load_utk(path_joints, path_label, T=20, V=20):
-    """
-    加载 UTKinect-Action3D 骨架数据。
-    每行首列是帧序号，后续 20*3 列为 20 个关节的 (x,y,z)。
-    actionLabel.txt 指定每个视频的动作段区间。
-    返回同样的 [N,3,T,V] 和 [N,] 标签。
-    """  # UTKinect 格式说明
-    # 解析动作段标签
+    # 1. 读取动作段标签
     label_info = {}
     for line in open(path_label):
         parts = line.strip().split()
-        if not parts:
-            continue
-        vid = parts[0]  # 如 's01_e01'
+        if not parts: continue
+        vid = parts[0]
         label_info[vid] = []
         idx = 1
         while idx + 2 < len(parts):
@@ -58,32 +56,89 @@ def load_utk(path_joints, path_label, T=20, V=20):
             label_info[vid].append((act, s, e))
             idx += 3
 
+    # 2. 解析骨架文件
+    files = sorted(os.listdir(path_joints))
+    data_list, label_list = [], []
     action_map = {'walk':0,'sitDown':1,'standUp':2,'pickUp':3,'carry':4,
                   'throw':5,'push':6,'pull':7,'waveHands':8,'clapHands':9}
 
-    files = sorted(os.listdir(path_joints))
-    data_list, label_list = [], []
+    # 调试打印
+    print("UTK label videos:", list(label_info.keys())[:5])
+    print("UTK skeleton files:", files[:5])
+
     for fname in files:
-        if not fname.endswith('.txt'):
-            continue
-        vid = fname[:6]
+        if not fname.endswith('.txt'): continue
+        # 通用提取 'sXX_eYY'
+        base = os.path.splitext(fname)[0]
+        parts = base.split('_')
+        vid = parts[-2] + '_' + parts[-1]
         if vid not in label_info:
             continue
 
         mat = np.loadtxt(os.path.join(path_joints, fname), dtype=np.float32)
-        # 丢弃第 0 列（帧号），重塑剩余 60 列→(帧数,20,3)
         coords = mat[:,1:].reshape(-1, V, 3)
 
-        # 按每个标注段切割并对齐到 T 帧
         for act, s, e in label_info[vid]:
             seg = coords[s:e]
             buf = np.zeros((T, V, 3), dtype=np.float32)
             buf[:min(len(seg),T)] = seg[:T]
             data_list.append(buf.transpose(2,0,1))
             label_list.append(action_map[act])
+
+    # 断言确保非空
+    assert data_list, "ERROR: 没有读取到任何段，请检查文件名与标签 vid 是否对得上"
     data = np.stack(data_list, axis=0)
     labels = np.array(label_list, dtype=np.int64)
     return data, labels
+
+# def load_utk(path_joints, path_label, T=20, V=20):
+#     """
+#     加载 UTKinect-Action3D 骨架数据。
+#     每行首列是帧序号，后续 20*3 列为 20 个关节的 (x,y,z)。
+#     actionLabel.txt 指定每个视频的动作段区间。
+#     返回同样的 [N,3,T,V] 和 [N,] 标签。
+#     """  # UTKinect 格式说明
+#     # 解析动作段标签
+#     label_info = {}
+#     for line in open(path_label):
+#         parts = line.strip().split()
+#         if not parts:
+#             continue
+#         vid = parts[0]  # 如 's01_e01'
+#         label_info[vid] = []
+#         idx = 1
+#         while idx + 2 < len(parts):
+#             act = parts[idx].strip(':')
+#             s, e = int(parts[idx+1]), int(parts[idx+2])
+#             label_info[vid].append((act, s, e))
+#             idx += 3
+#
+#     action_map = {'walk':0,'sitDown':1,'standUp':2,'pickUp':3,'carry':4,
+#                   'throw':5,'push':6,'pull':7,'waveHands':8,'clapHands':9}
+#
+#     files = sorted(os.listdir(path_joints))
+#     data_list, label_list = [], []
+#     for fname in files:
+#         if not fname.endswith('.txt'):
+#             continue
+#         vid = fname[:6]
+#         if vid not in label_info:
+#             continue
+#
+#         mat = np.loadtxt(os.path.join(path_joints, fname), dtype=np.float32)
+#         # 丢弃第 0 列（帧号），重塑剩余 60 列→(帧数,20,3)
+#         coords = mat[:,1:].reshape(-1, V, 3)
+#
+#         # 按每个标注段切割并对齐到 T 帧
+#         for act, s, e in label_info[vid]:
+#             seg = coords[s:e]
+#             buf = np.zeros((T, V, 3), dtype=np.float32)
+#             buf[:min(len(seg),T)] = seg[:T]
+#             data_list.append(buf.transpose(2,0,1))
+#             label_list.append(action_map[act])
+#     data = np.stack(data_list, axis=0)
+#     labels = np.array(label_list, dtype=np.int64)
+#     return data, labels
 
 
 # # File: data_utils.py

@@ -21,13 +21,18 @@ def main():
     if args.dataset == 'MSR':
         data, labels = load_msr("data/MSRAction3DSkeletonReal3D")
     else:
-        data, labels = load_utk("data/UTKinect_skeletons","data/actionLabel.txt")
+        data, labels = load_utk("data/UTKinect_skeletons", "data/UTKinect_skeletons/actionLabel.txt")
+
 
     # 划分仅已知类进行训练
     train_x, train_y, *_ = split_known_unknown(data, labels, args.known_classes)
 
     # DataLoader 准备
-    ds = TensorDataset(torch.tensor(train_x), torch.tensor(train_y))
+    # ds = TensorDataset(torch.tensor(train_x), torch.tensor(train_y))
+    # 对数据直接从 numpy→tensor，保持 dtype 和内存共享
+    ds = TensorDataset(torch.from_numpy(train_x),  # numpy.float32 → torch.float32 :contentReference[oaicite:2]{index=2}
+                       torch.from_numpy(train_y).long())  # numpy.int64 → torch.int64
+
     loader = DataLoader(ds, batch_size=args.batch_size, shuffle=True)
 
     # 模型、损失与优化器

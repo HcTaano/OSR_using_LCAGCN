@@ -27,7 +27,7 @@ def openmax_recalibrate(logits, feat, cents, wbls, alpha=3):
 def eval_ds(ds, known):
     # 加载 & 划分
     data, labels = (load_msr("data/MSRAction3DSkeletonReal3D") if ds=='MSR'
-                    else load_utk("data/UTKinect_skeletons","data/actionLabel.txt"))
+                    else load_utk("data/UTKinect_skeletons", "data/UTKinect_skeletons/actionLabel.txt"))
     _, _, tk_x, tk_y, tu_x, tu_y = split_known_unknown(data, labels, known)
 
     # 模型与 Weibull 参数
