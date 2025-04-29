@@ -4,15 +4,15 @@
 ## 数据集选用
 ### MSRAction3DSkeletonReal3D
 MSR 3d action数据集记录了人体动作序列，共包含20个动作类型，10个被试者，每个被试者执行每个动作2或3次。总共有567个深度图序列。分辨率为640x240。
-### UTKinect_skeletons
+### UTKinect_skeletons（暂不训练）
 The videos was captured using a single stationary Kinect with Kinect for Windows SDK Beta Version. There are 10 action types: walk, sit down, stand up, pick up, carry, throw, push, pull, wave hands, clap hands. There are 10 subjects, Each subject performs each actions twice. Three channels were recorded: RGB, depth and skeleton joint locations. The three channel are synchronized. The framerate is 30f/s. Note we only recorded the frames when the skeleton was tracked, the frame number of the files has jumps. The final frame rate is about 15f/sec. (There is around 2% of the frames where there are multiple skeleton info recorded with slightly different joint locations. This is not caused by a second person. You can chooce either one. )
 Sketetal joint Locations (.txt) Each row contains the data of one frame, the first number is frame number, the following numbers are the (x,y,z) locations of joint 1-20. The x, y, and z are the coordinates relative to the sensor array, in meters. Detailed description of the coordinates can be found here The index of the joints are described here.
 
 ## 当前存在的问题
-1. 如何将两种数据集分开训练和测试并输出对应的结果
-2. 训练过程中（如utk），num_classes=10，是否代表闭集训练使用了全部的类别，而未区分未知类已知类
-3. 如何整合各模块功能，并且怎么运行各功能，以实现数据预处理、闭集训练模型、验证开集性能、查看输出结果等。
-4. 为各段代码添加更详细的注释，并标明将在后续什么过程中发挥什么用途
+1. 训练出了一个.pth文件，但不知道如何进行继续训练，并再进行之后的验证开集性能、查看输出结果等工作。
+2. 配置一个config文件，来方便配置模型参数。
+3. 需要一个design.md文档解释各个文件/模块的功能，以及写入如何使用该项目进行训练的过程和命令。
+4. ukt数据集仍无法训练（暂不解决）
 
 
 ## 电脑性能

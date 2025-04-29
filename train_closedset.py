@@ -12,8 +12,8 @@ def main():
     parser = argparse.ArgumentParser(description="闭集训练：LC-AGCN on MSR/UTK")  # argparse 用法
     parser.add_argument('--dataset', choices=['MSR','UTK'], required=True)
     parser.add_argument('--known_classes', type=int, nargs='+', required=True)
-    parser.add_argument('--batch_size', type=int, default=16)
-    parser.add_argument('--epochs', type=int, default=30)
+    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--lr', type=float, default=1e-3)
     args = parser.parse_args()
 
