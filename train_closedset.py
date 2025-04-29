@@ -21,8 +21,10 @@ def main():
     if args.dataset == 'MSR':
         data, labels = load_msr("data/MSRAction3DSkeletonReal3D")
     else:
-        data, labels = load_utk("data/UTKinect_skeletons", "data/UTKinect_skeletons/actionLabel.txt")
-
+        data, labels = load_utk(
+            "data/UTKinect_skeletons/joints",  # ← 指向真正存放骨架 .txt 的子文件夹
+            "data/UTKinect_skeletons/actionLabel.txt"
+        )
 
     # 划分仅已知类进行训练
     train_x, train_y, *_ = split_known_unknown(data, labels, args.known_classes)

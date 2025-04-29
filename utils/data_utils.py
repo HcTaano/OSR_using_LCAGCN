@@ -36,28 +36,52 @@ def load_msr(path, T=20, V=20):
     labels = np.array(label_list, dtype=np.int64)
     return data, labels
 
-# utils/data_utils.py
-
-import os
-import numpy as np
-
 def load_utk(path_joints, path_label, T=20, V=20):
-    # 1. 读取动作段标签
+    """
+       加载 UTKinect-Action3D 骨架数据（每行 1 + 20*3 列）。
+       返回 data: [N,3,T,20], labels: [N].
+    """
+    # —— 1. 一次性读取全部 tokens
+    tokens = open(path_label).read().split()
     label_info = {}
-    for line in open(path_label):
-        parts = line.strip().split()
-        if not parts: continue
-        vid = parts[0]
+    i = 0
+    # —— 2. 按 vid + 若干 (action, start, end) 解析
+    while i < len(tokens):
+        vid = tokens[i]                # e.g. 's01_e01'
         label_info[vid] = []
-        idx = 1
-        while idx + 2 < len(parts):
-            act = parts[idx].strip(':')
-            s, e = int(parts[idx+1]), int(parts[idx+2])
+        i += 1
+        # 若下一个 token 以 ':' 结尾，说明是动作名
+        while i+2 < len(tokens) and tokens[i].endswith(':'):
+            act = tokens[i].rstrip(':')
+            s, e = int(tokens[i+1]), int(tokens[i+2])
             label_info[vid].append((act, s, e))
-            idx += 3
+            i += 3
+    # 之后的逻辑同前：下钻子目录、过滤文件、reshape、对齐…
+# def load_utk(path_joints, path_label, T=20, V=20):
+#     # 1. 读取动作段标签
+#     label_info = {}
+#     for line in open(path_label):
+#         parts = line.strip().split()
+#         if not parts: continue
+#         vid = parts[0]
+#         label_info[vid] = []
+#         idx = 1
+#         while idx + 2 < len(parts):
+#             act = parts[idx].strip(':')
+#             s, e = int(parts[idx+1]), int(parts[idx+2])
+#             label_info[vid].append((act, s, e))
+#             idx += 3
 
-    # 2. 解析骨架文件
-    files = sorted(os.listdir(path_joints))
+    # 自动下钻至真正存放骨架 .txt 的子目录
+    if os.path.isdir(os.path.join(path_joints, 'joints')):
+        path_joints = os.path.join(path_joints, 'joints')  # 递归下钻
+
+    # 仅保留以 joints_ 开头的骨架文件，过滤掉 actionLabel.txt 等
+    files = sorted([
+        f for f in os.listdir(path_joints)
+        if f.endswith('.txt') and f.startswith('joints_')
+    ])  # 这样 files 中就只剩 ['joints_s01_e01.txt', …]
+
     data_list, label_list = [], []
     action_map = {'walk':0,'sitDown':1,'standUp':2,'pickUp':3,'carry':4,
                   'throw':5,'push':6,'pull':7,'waveHands':8,'clapHands':9}
@@ -66,12 +90,16 @@ def load_utk(path_joints, path_label, T=20, V=20):
     print("UTK label videos:", list(label_info.keys())[:5])
     print("UTK skeleton files:", files[:5])
 
+    # —— 4. 逐文件加载、切片、对齐
     for fname in files:
-        if not fname.endswith('.txt'): continue
+        # if not fname.endswith('.txt'): continue
         # 通用提取 'sXX_eYY'
+        # 只处理 joints_sXX_eYY*.txt
+        # vid 格式应为 'sXX_eYY'
         base = os.path.splitext(fname)[0]
+        # 举例 'joints_s01_e01_frame001' → ['joints','s01','e01','frame001']
         parts = base.split('_')
-        vid = parts[-2] + '_' + parts[-1]
+        vid = parts[1] + '_' + parts[2]          # 's01'+'_'+'e01'
         if vid not in label_info:
             continue
 
@@ -85,6 +113,7 @@ def load_utk(path_joints, path_label, T=20, V=20):
             data_list.append(buf.transpose(2,0,1))
             label_list.append(action_map[act])
 
+    # —— 5. 检查并返回
     # 断言确保非空
     assert data_list, "ERROR: 没有读取到任何段，请检查文件名与标签 vid 是否对得上"
     data = np.stack(data_list, axis=0)
