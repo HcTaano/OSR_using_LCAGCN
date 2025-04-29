@@ -2,6 +2,8 @@
 
 import os
 import argparse
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -27,9 +29,9 @@ def parse_args():
                         default=(train_cfg.known_classes if USE_CONFIG else None),
                         help="已知类列表，如 0 1 …")
     parser.add_argument('--batch_size', type=int,
-                        default=(train_cfg.batch_size if USE_CONFIG else 16))
+                        default=(train_cfg.batch_size if USE_CONFIG else 64))
     parser.add_argument('--epochs', type=int,
-                        default=(train_cfg.epochs if USE_CONFIG else 30))
+                        default=(train_cfg.epochs if USE_CONFIG else 100))
     parser.add_argument('--lr', type=float,
                         default=(train_cfg.lr if USE_CONFIG else 1e-3))
     parser.add_argument('--resume', type=str, default=None,
@@ -53,7 +55,10 @@ def main():
     assert train_x.shape[0] > 0, "训练集为空，请检查 known_classes 是否正确"
 
     # 三、构造 DataLoader
-    tensor_x = torch.from_numpy(train_x)                          # numpy→tensor
+    # tensor_x = torch.from_numpy(train_x)
+    # numpy float32 → torch.FloatTensor；若 train_x 仍为 float64，可强制 .astype 再转
+    tensor_x = torch.from_numpy(train_x.astype(np.float32)).float()  # 强制 float32
+    # numpy→tensor
     tensor_y = torch.from_numpy(train_y).long()
     loader = DataLoader(TensorDataset(tensor_x, tensor_y),
                         batch_size=args.batch_size, shuffle=True)
@@ -78,7 +83,10 @@ def main():
     for epoch in range(start_epoch, args.epochs):
         total_loss = 0.0
         for x, y in loader:
-            x, y = x.to(device), y.to(device)
+            # x, y = x.to(device), y.to(device)
+            # 再次确保输入为 float32，再送入模型&#8203;:contentReference[oaicite:0]{index=0}
+            x = x.to(device).float()
+            y = y.to(device)
             logits, _ = model(x)
             loss = criterion(logits, y)
             optimizer.zero_grad()

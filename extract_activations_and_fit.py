@@ -17,7 +17,7 @@ def main():
 
     for ds, loader in [('MSR', load_msr), ('UTK', load_utk)]:
         # --- 1. 准备模型与 checkpoint 路径 ---
-        known = list(range(15)) if ds=='MSR' else list(range(8))
+        known = list(range(18)) if ds=='MSR' else list(range(8))
         model = LCAGCN(num_class=len(known)).to(device)
 
         # 优先尝试加载最终模型权重文件
@@ -90,7 +90,7 @@ if __name__ == "__main__":
 #     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #     for ds, loader in [('MSR', load_msr), ('UTK', load_utk)]:
 #         # 加载模型
-#         known = list(range(15)) if ds=='MSR' else list(range(8))
+#         known = list(range(18)) if ds=='MSR' else list(range(8))
 #         model = LCAGCN(num_class=len(known)).to(device)
 #         model.load_state_dict(torch.load(
 #             f"checkpoints/{ds.lower()}_model_known{len(known)}.pth"))

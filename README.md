@@ -10,7 +10,7 @@ Sketetal joint Locations (.txt) Each row contains the data of one frame, the fir
 
 ## 当前存在的问题
 1. 我当前不想解析utk的标签，因为它会让openmax_inference.py出现错误
-2. 在epoch==1000,lr==0.0001,batch_size==128下，MSR的开集AUC为0.563，需要优化（最重要）
+2. 在epoch==1000,lr==0.0001,batch_size==128下，MSR的开集AUC为0.563，极度需要优化（最重要）
 3. 让openmax_inference.py输出更多的评价指标，另外最好也要加入闭集的指标性能检测。
 4. 让一直类别的数量适当增大（如增大到18类），需要修改对应代码。
 

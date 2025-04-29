@@ -9,8 +9,8 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 if __name__ == "__main__":
-    # 假设使用 15 个已知类（MSR 数据集）
-    num_known = 15
+    # 假设使用 18 个已知类（MSR 数据集）
+    num_known = 18
     model = LCAGCN(num_class=num_known)
 
     # 将模型移动到 CPU 并打印整体结构与每层输出尺寸、参数量

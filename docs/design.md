@@ -79,14 +79,15 @@ conda init powershell
 2. 闭集训练（MSR 数据集示例）
 训练前可选地指定 --resume 路径继续训练
 ```powershell
-python .\train_closedset.py --dataset MSR `
-    --known_classes 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 `
-    --epochs 1000 `
-    --lr 0.0001 `
-    --resume checkpoints/msr_checkpoint_epoch99.pth
+python .\train_closedset.py `
+  --dataset MSR `
+  --known_classes 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 `
+  --epochs 1000 `
+  --lr 0.0001`
+  --resume checkpoints/msr_checkpoint_epoch99.pth
 ```
 ```powershell
-python .\train_closedset.py --dataset MSR --known_classes 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 --epochs 100 lr 0.001
+python .\train_closedset.py --dataset MSR --known_classes 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 --epochs 1000 --lr 0.0001
 ```
 说明：用 python 命令运行脚本，Windows 下可直接 .\script.py ([How to Run Your Python Scripts and Code](https://realpython.com/run-python-scripts/?utm_source=chatgpt.com))
 
