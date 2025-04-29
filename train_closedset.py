@@ -1,52 +1,82 @@
 # train_closedset.py
 
+import os
 import argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
+
+# 从 config.py 导入集中配置（可选）
+try:
+    from config import train_cfg, path_cfg
+    USE_CONFIG = True
+except ImportError:
+    USE_CONFIG = False
+
 from utils import load_msr, load_utk, split_known_unknown
 from models import LCAGCN
 
-def main():
-    parser = argparse.ArgumentParser(description="闭集训练：LC-AGCN on MSR/UTK")  # argparse 用法
-    parser.add_argument('--dataset', choices=['MSR','UTK'], required=True)
-    parser.add_argument('--known_classes', type=int, nargs='+', required=True)
-    parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--epochs', type=int, default=50)
-    parser.add_argument('--lr', type=float, default=1e-3)
-    args = parser.parse_args()
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Closed-set Training for LC-AGCN with Resume Support")
+    parser.add_argument('--dataset', choices=['MSR','UTK'], required=not USE_CONFIG,
+                        default=(train_cfg.dataset if USE_CONFIG else None),
+                        help="选择数据集：MSR 或 UTK")
+    parser.add_argument('--known_classes', type=int, nargs='+',
+                        default=(train_cfg.known_classes if USE_CONFIG else None),
+                        help="已知类列表，如 0 1 …")
+    parser.add_argument('--batch_size', type=int,
+                        default=(train_cfg.batch_size if USE_CONFIG else 16))
+    parser.add_argument('--epochs', type=int,
+                        default=(train_cfg.epochs if USE_CONFIG else 30))
+    parser.add_argument('--lr', type=float,
+                        default=(train_cfg.lr if USE_CONFIG else 1e-3))
+    parser.add_argument('--resume', type=str, default=None,
+                        help="Checkpoint 文件路径，继续训练时使用")  # 恢复训练&#8203;:contentReference[oaicite:2]{index=2}
+    return parser.parse_args()
 
-    # 根据选择加载数据
+def main():
+    args = parse_args()
+
+    # 一、加载数据
     if args.dataset == 'MSR':
-        data, labels = load_msr("data/MSRAction3DSkeletonReal3D")
+        data, labels = load_msr(path_cfg.msr_data if USE_CONFIG else "data/MSRAction3DSkeletonReal3D")
     else:
         data, labels = load_utk(
-            "data/UTKinect_skeletons/joints",  # ← 指向真正存放骨架 .txt 的子文件夹
-            "data/UTKinect_skeletons/actionLabel.txt"
+            path_cfg.utk_data if USE_CONFIG else "data/UTKinect_skeletons",
+            path_cfg.utk_label if USE_CONFIG else "data/UTKinect_skeletons/actionLabel.txt"
         )
 
-    # 划分仅已知类进行训练
-    train_x, train_y, *_ = split_known_unknown(data, labels, args.known_classes)
+    # 二、划分已知/未知，仅用已知训练
+    train_x, train_y, _, _, _, _ = split_known_unknown(data, labels, args.known_classes)
+    assert train_x.shape[0] > 0, "训练集为空，请检查 known_classes 是否正确"
 
-    # DataLoader 准备
-    # ds = TensorDataset(torch.tensor(train_x), torch.tensor(train_y))
-    # 对数据直接从 numpy→tensor，保持 dtype 和内存共享
-    ds = TensorDataset(torch.from_numpy(train_x),  # numpy.float32 → torch.float32 :contentReference[oaicite:2]{index=2}
-                       torch.from_numpy(train_y).long())  # numpy.int64 → torch.int64
+    # 三、构造 DataLoader
+    tensor_x = torch.from_numpy(train_x)                          # numpy→tensor
+    tensor_y = torch.from_numpy(train_y).long()
+    loader = DataLoader(TensorDataset(tensor_x, tensor_y),
+                        batch_size=args.batch_size, shuffle=True)
 
-    loader = DataLoader(ds, batch_size=args.batch_size, shuffle=True)
-
-    # 模型、损失与优化器
+    # 四、模型、损失、优化器
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = LCAGCN(num_class=len(args.known_classes)).to(device)
+    model = LCAGCN(num_class=len(args.known_classes)).to(device)  # 类别数由已知类长度决定
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
-    # 训练循环
+    # 五、可选：从 checkpoint 恢复
+    start_epoch = 0
+    if args.resume:
+        ckpt = torch.load(args.resume, map_location=device)
+        model.load_state_dict(ckpt['model_state'])
+        optimizer.load_state_dict(ckpt['optim_state'])           # 恢复 Adam 内部状态&#8203;:contentReference[oaicite:3]{index=3}
+        start_epoch = ckpt['epoch'] + 1
+        print(f"Resumed training from epoch {start_epoch}")
+
+    # 六、训练循环
     model.train()
-    for epoch in range(args.epochs):
-        total_loss = 0
+    for epoch in range(start_epoch, args.epochs):
+        total_loss = 0.0
         for x, y in loader:
             x, y = x.to(device), y.to(device)
             logits, _ = model(x)
@@ -55,47 +85,28 @@ def main():
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-        print(f"Epoch {epoch+1}/{args.epochs}, Loss: {total_loss/len(loader):.4f}")
+        avg_loss = total_loss / len(loader)
+        print(f"[{args.dataset}] Epoch {epoch}/{args.epochs-1}  Loss: {avg_loss:.4f}")
 
-    # 保存模型权重
-    torch.save(model.state_dict(),
-               f"checkpoints/{args.dataset.lower()}_model_known{len(args.known_classes)}.pth")
-    print("模型已保存。")
+        # 七、保存 checkpoint
+        os.makedirs(path_cfg.ckpt_dir if USE_CONFIG else "checkpoints", exist_ok=True)
+        ckpt_path = os.path.join(
+            path_cfg.ckpt_dir if USE_CONFIG else "checkpoints",
+            f"{args.dataset.lower()}_checkpoint_epoch{epoch}.pth"
+        )
+        torch.save({
+            'epoch': epoch,
+            'model_state': model.state_dict(),
+            'optim_state': optimizer.state_dict()
+        }, ckpt_path)
+
+    # 八、最终保存模型权重
+    final_path = os.path.join(
+        path_cfg.ckpt_dir if USE_CONFIG else "checkpoints",
+        f"{args.dataset.lower()}_model_known{len(args.known_classes)}.pth"
+    )
+    torch.save(model.state_dict(), final_path)
+    print("Training complete. Model saved to", final_path)
 
 if __name__ == "__main__":
     main()
-
-
-
-# # File: train_closedset.py
-# import torch, torch.nn as nn, torch.optim as optim
-# from torch.utils.data import TensorDataset, DataLoader
-# from models.lc_agcn import LCAGCN
-# from utils.data_utils import load_msr, load_utk
-#
-# def train_model(data, labels, num_classes, device):
-#     model = LCAGCN(num_class=num_classes).to(device)
-#     optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
-#     criterion = nn.CrossEntropyLoss()
-#     dataset = TensorDataset(torch.tensor(data), torch.tensor(labels))
-#     loader = DataLoader(dataset, batch_size=16, shuffle=True)
-#     model.train()
-#     for epoch in range(30):
-#         for x, y in loader:
-#             x, y = x.to(device), y.to(device)
-#             logits, _ = model(x)
-#             loss = criterion(logits, y)
-#             optimizer.zero_grad(); loss.backward(); optimizer.step()
-#     return model
-#
-# if __name__ == "__main__":
-#     import sys
-#     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-#     # 训练 MSRAction3D (20 类闭集)
-#     msr_data, msr_labels = load_msr("data/MSRAction3DSkeletonReal3D")
-#     msr_model = train_model(msr_data, msr_labels, num_classes=20, device=device)
-#     torch.save(msr_model.state_dict(), "models/msr_model.pth")
-#     # 训练 UTKinect (10 类闭集)
-#     utk_data, utk_labels = load_utk("data/UTKinect_skeletons", "data/actionLabel.txt")
-#     utk_model = train_model(utk_data, utk_labels, num_classes=10, device=device)
-#     torch.save(utk_model.state_dict(), "models/utk_model.pth")

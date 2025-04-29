@@ -9,10 +9,10 @@ The videos was captured using a single stationary Kinect with Kinect for Windows
 Sketetal joint Locations (.txt) Each row contains the data of one frame, the first number is frame number, the following numbers are the (x,y,z) locations of joint 1-20. The x, y, and z are the coordinates relative to the sensor array, in meters. Detailed description of the coordinates can be found here The index of the joints are described here.
 
 ## 当前存在的问题
-1. 训练出了一个.pth文件，但不知道如何进行继续训练，并再进行之后的验证开集性能、查看输出结果等工作。
-2. 配置一个config文件，来方便配置模型参数。
-3. 需要一个design.md文档解释各个文件/模块的功能，以及写入如何使用该项目进行训练的过程和命令。
-4. ukt数据集仍无法训练（暂不解决）
+1. 我当前不想解析utk的标签，因为它会让openmax_inference.py出现错误
+2. 在epoch==1000,lr==0.0001,batch_size==128下，MSR的开集AUC为0.563，需要优化（最重要）
+3. 让openmax_inference.py输出更多的评价指标，另外最好也要加入闭集的指标性能检测。
+4. 让一直类别的数量适当增大（如增大到18类），需要修改对应代码。
 
 
 ## 电脑性能
