@@ -33,45 +33,126 @@ def weibull_cdf(x, w):
     """计算经调整的Weibull累积分布函数(CDF)值"""
     return exponweib.cdf(x + (10000 - w['min_val']), a=1, c=w['c'], loc=0, scale=w['scale'])
 
-def openmax_recalibrate(logits, feat, cents, wbls, alpha=3):
+
+def openmax_recalibrate(logits, feat, cents, wbls, alpha=5, scale_factor=1.5):
     """
-    实现OpenMax算法的重校准
-    
+    改进的OpenMax重校准:
+    1. 动态alpha选择
+    2. 距离缩放优化
+    3. 改进的未知样本得分计算
+
     参数:
         logits: 网络输出的原始logits
         feat: 对应的特征向量
         cents: 各类质心
         wbls: 各类的Weibull参数
         alpha: 考虑重校准的前α个类
-        
+        scale_factor: 距离缩放因子，用于调整未知样本识别灵敏度
+
     返回:
         包含未知类在内的概率分布 (未知类为第0个元素)
     """
+    # 动态调整alpha基于logits分布
+    max_logit = np.max(logits)
+    logit_diff = max_logit - np.mean(logits)
+    if logit_diff > 5.0:  # 高置信度，减小alpha
+        alpha = max(2, alpha - 1)
+    elif logit_diff < 2.0:  # 低置信度，增加alpha
+        alpha = min(8, alpha + 1)
+
     # 选择top-alpha类做激活衰减
     ranked = np.argsort(logits)[::-1]
     omega = np.zeros_like(logits)
     for i in range(min(alpha, len(ranked))):
-        # 线性衰减权重
-        omega[ranked[i]] = (alpha - i) / alpha
-    
+        # 非线性衰减权重
+        omega[ranked[i]] = (1 - 0.8 * (i / alpha) ** 2)
+
     # 计算到各类质心的距离
-    dists = np.linalg.norm(feat - cents, axis=1)
-    
+    dists = np.linalg.norm(feat - cents, axis=1) * scale_factor
+
     # 计算Weibull概率
     wprobs = np.array([weibull_cdf(d, w) for d, w in zip(dists, wbls)])
-    
+
     # 激活衰减
     logits_hat = logits * (1 - omega * wprobs)
-    
-    # 未知类得分：原始激活减去重校准激活的总和
-    unk_score = np.sum(logits - logits_hat)
-    
+
+    # 改进的未知类得分计算，考虑整体分布
+    unk_score = np.sum(logits - logits_hat) * (1.0 + 0.2 * np.std(wprobs))
+
     # 合并未知类得分和重校准后的各类得分
     new_logits = np.concatenate(([unk_score], logits_hat))
-    
-    # 转为概率分布
+
+    # 生成概率分布，稍微平滑处理
     exp = np.exp(new_logits - np.max(new_logits))
     return exp / np.sum(exp)
+
+def ensemble_openmax_inference(models, x, centroids_list, weibulls_list):
+    """使用多个模型组合预测，提高开集识别可靠性"""
+    all_probs = []
+    
+    # 获取每个模型的预测
+    for i, model in enumerate(models):
+        with torch.no_grad():
+            logits, feats = model(x)
+            logits_np = logits.cpu().numpy()
+            feats_np = feats.cpu().numpy()
+        
+        # 应用优化后的OpenMax
+        probs = openmax_recalibrate(
+            logits_np, feats_np, 
+            centroids_list[i], weibulls_list[i],
+            alpha=5, scale_factor=1.5
+        )
+        all_probs.append(probs)
+    
+    # 加权平均，更侧重高置信度预测
+    ensemble_probs = np.zeros_like(all_probs[0])
+    for probs in all_probs:
+        # 计算置信度权重
+        confidence = 1.0 - probs[0]  # 非未知类概率和
+        ensemble_probs += probs * confidence
+    
+    return ensemble_probs / np.sum(ensemble_probs)
+    
+# def openmax_recalibrate(logits, feat, cents, wbls, alpha=3):
+#     """
+#     实现OpenMax算法的重校准
+#
+#     参数:
+#         logits: 网络输出的原始logits
+#         feat: 对应的特征向量
+#         cents: 各类质心
+#         wbls: 各类的Weibull参数
+#         alpha: 考虑重校准的前α个类
+#
+#     返回:
+#         包含未知类在内的概率分布 (未知类为第0个元素)
+#     """
+#     # 选择top-alpha类做激活衰减
+#     ranked = np.argsort(logits)[::-1]
+#     omega = np.zeros_like(logits)
+#     for i in range(min(alpha, len(ranked))):
+#         # 线性衰减权重
+#         omega[ranked[i]] = (alpha - i) / alpha
+#
+#     # 计算到各类质心的距离
+#     dists = np.linalg.norm(feat - cents, axis=1)
+#
+#     # 计算Weibull概率
+#     wprobs = np.array([weibull_cdf(d, w) for d, w in zip(dists, wbls)])
+#
+#     # 激活衰减
+#     logits_hat = logits * (1 - omega * wprobs)
+#
+#     # 未知类得分：原始激活减去重校准激活的总和
+#     unk_score = np.sum(logits - logits_hat)
+#
+#     # 合并未知类得分和重校准后的各类得分
+#     new_logits = np.concatenate(([unk_score], logits_hat))
+#
+#     # 转为概率分布
+#     exp = np.exp(new_logits - np.max(new_logits))
+#     return exp / np.sum(exp)
 
 def compute_oscr(y_true, open_scores, preds):
     """

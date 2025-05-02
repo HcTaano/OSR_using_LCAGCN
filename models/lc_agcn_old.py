@@ -1,4 +1,4 @@
-# File: models/lc_agcn.py
+# File: models/lc_agcn_old.py
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

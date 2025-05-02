@@ -16,11 +16,24 @@ class TrainConfig(BaseConfig):
     # 训练超参
     dataset: str = 'MSR'      # 'MSR' 或 'UTK'
     # 将可变默认 list 改为 default_factory 以避免 dataclass 报错
+    # 参数组1
     known_classes: List[int] = field(default_factory=lambda: list(range(18)))  # 扩大到 18 类
     batch_size: int = 128     # 批大小
     epochs: int = 1000        # 总训练轮次
-    lr: float = 1e-4          # 初始学习率
-    resume: str = None        # checkpoint 路径
+    lr: float = 1e-3          # 初始学习率
+    # 参数组2——更低学习率
+    known_classes: List[int] = field(default_factory=lambda: list(range(18)))
+    batch_size: int = 128
+    epochs: int = 1000
+    lr: float = 5e-4
+    # 参数组3——更高学习率
+    known_classes: List[int] = field(default_factory=lambda: list(range(18)))
+    batch_size: int = 64
+    epochs: int = 1000
+    lr: float = 2e-3
+
+    resume: str = None  # checkpoint 路径
+
 
 @dataclass
 class PathsConfig(BaseConfig):

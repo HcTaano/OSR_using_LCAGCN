@@ -14,6 +14,53 @@ Sketetal joint Locations (.txt) Each row contains the data of one frame, the fir
 3. 让openmax_inference.py输出更多的评价指标，另外最好也要加入闭集的指标性能检测。
 4. 让一直类别的数量适当增大（如增大到18类），需要修改对应代码。
 
+## 最新优化
+如何使用这些新功能：
+### 1. 训练优化
+您可以使用优化后的训练过程，包括数据增强、余弦退火学习率、混合精度训练和早停策略：
+``` bash
+python train_closedset.py --dataset MSR --known_classes 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 --epochs 1000 --lr 0.001
+```
+### 2. 集成学习推理
+训练多个模型后，您可以使用集成学习进行推理：
+``` python
+# 加载多个模型
+model1 = LCAGCN(num_class=len(known_classes)).to(device)
+model1.load_state_dict(torch.load("checkpoints/model1.pth"))
+model2 = LCAGCN(num_class=len(known_classes)).to(device)
+model2.load_state_dict(torch.load("checkpoints/model2.pth"))
+models = [model1, model2]
+
+# 加载对应的Weibull参数
+centroids1 = np.load("weibull/centroids1.npy")
+weibulls1 = torch.load("weibull/weibull1.pth")
+centroids2 = np.load("weibull/centroids2.npy")
+weibulls2 = torch.load("weibull/weibull2.pth")
+centroids_list = [centroids1, centroids2]
+weibulls_list = [weibulls1, weibulls2]
+
+# 使用集成推理
+ensemble_probs = ensemble_openmax_inference(models, x, centroids_list, weibulls_list)
+```
+### 优化效果
+通过这些优化，您可以期待：
+1. **更好的泛化能力**：数据增强提供了更多样的训练数据，有助于模型适应不同的输入变化。
+2. **更稳定的训练**：余弦退火学习率、类别权重和早停策略能让训练更快收敛，避免过拟合。
+3. **更快的训练速度**：混合精度训练可以加速训练过程，特别是在支持Tensor Core的GPU上。
+4. **更可靠的未知类拒识**：集成学习组合多个模型的预测，减少单一模型的推理偏差，提高开集识别性能。
+这些改进应该能够帮助您的模型在开集识别任务中取得更好的性能表现。
+
+### 正确的执行顺序应为：
+1. 执行train_closedset.py（闭集训练）
+```powershell
+python train_closedset.py --dataset MSR --known_classes 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 --epochs 1000 --lr 0.001 --batch_size 128
+python train_closedset.py --dataset MSR --known_classes 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 --epochs 200 --lr 0.0001 --batch_size 64
+
+```
+2. 执行extract_activations_and_fit.py（特征提取和Weibull拟合）
+3. 执行openmax_inference.py（单模型OpenMax评估）
+4. 执行ensemble_openmax_inference_pipeline.py（多模型集成评估，可选）
+
 
 ## 电脑性能
 GPU: 3060laptop

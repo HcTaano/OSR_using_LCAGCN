@@ -1,3 +1,3 @@
 # models/__init__.py
 
-from .lc_agcn import LCAGCN  # 导出模型类
+from .lc_agcn_old import LCAGCN  # 导出模型类

@@ -2,7 +2,7 @@
 
 import torch
 from torchsummary import summary    # 需要先 pip install torchsummary
-from models.lc_agcn import LCAGCN
+from models.lc_agcn_old import LCAGCN
 
 def count_parameters(model):
     # 返回总的可训练参数量
