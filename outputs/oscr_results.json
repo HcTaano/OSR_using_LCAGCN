@@ -1,0 +1,14 @@
+{
+  "MSR": {
+    "dataset": "MSR",
+    "num_known_classes": 18,
+    "num_test_known": 507,
+    "num_test_unknown": 60,
+    "closed_set_accuracy": 0.6351084812623274,
+    "openmax_known_accuracy": 0.44649446494464945,
+    "known_rejection_rate": 0.46548323471400394,
+    "oscr": 0.36263151223222206,
+    "unknown_rejection_rate": 0.7833333333333333,
+    "open_set_auc": 0.7951347797501643
+  }
+}
